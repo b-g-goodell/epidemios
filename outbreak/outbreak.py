@@ -31,8 +31,7 @@ Copyright (c) 2018-2020, Brandon Goodell. The license for this code is under `GN
 
 """
 from random import random
-from math import log
-import matplotlib.pyplot as plt
+from math import log, sqrt
 
 
 def sample_index(inp):
@@ -84,7 +83,7 @@ class Outbreak(object):
         return result
 
 
-def standard_SIR(fn, gestation_period=280.0, proportion_population_preggers=0.25525, human_lifespan=30842.5, median_time_between_trips_outside_the_house=1.0/0.5, social_distancing_modifier=0.0, probability_of_transmission_per_contact=0.01, median_time_before_recovery=28.0, proportion_of_people_with_capacity_to_recover_at_all=1.0, infection_fatality_period=14.0):
+def standard_SIR(fn, gestation_period=280.0, proportion_population_preggers=0.25525, human_lifespan=30842.5, sqrt_median_time_between_trips_outside_the_house=sqrt(2.0), social_distancing_modifier=0.0, probability_of_transmission_per_contact=0.01, median_time_before_recovery=28.0, proportion_of_people_with_capacity_to_recover_at_all=1.0, infection_fatality_period=14.0):
     parameters = []
     # parameters are per-capita
 
@@ -94,7 +93,7 @@ def standard_SIR(fn, gestation_period=280.0, proportion_population_preggers=0.25
     death_rate = 1.0/human_lifespan  # 1.0/median human lifespan in days
     parameters += [death_rate]
 
-    rate_of_interaction = 1.0/median_time_between_trips_outside_the_house  # 1.0/median wait time between trips outside the house per person
+    rate_of_interaction = 1.0/sqrt_median_time_between_trips_outside_the_house  # 1.0/median wait time between trips outside the house per person
     parameters += [rate_of_interaction * (1.0 - social_distancing_modifier) * probability_of_transmission_per_contact]
 
     recovery_rate = 1.0/median_time_before_recovery  # recovery time
