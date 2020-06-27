@@ -35,6 +35,9 @@ from math import log, sqrt
 
 
 def sample_index(inp):
+    """ Sample an index from the list of non-negative values in inp from a pmf proportional to inp
+
+    Example: if inp = [0.1, 0.2, 0.7], then we produce 2 with probability 70%, we produce 1 with probability 20%..."""
     assert isinstance(inp, list)
     assert len(inp) >= 1
     for _ in inp:
@@ -51,11 +54,13 @@ def sample_index(inp):
 
 
 def sample_delay(inp):
+    """ Generate an exponential random variable independent of previous generated variables"""
     assert inp > 0.0
     return -1.0/inp * log(random())
 
 
 class Outbreak(object):
+    """ Outbreak class tracks parameters, state, runtime, and has a lookup of different possible events"""
     def __init__(self, inp):
         self.parameters = inp['parameters']
         self.runtime = inp['runtime']
@@ -66,26 +71,41 @@ class Outbreak(object):
             assert isinstance(f[1], list)
 
     def run(self):
+        """ Execute a simulation"""
         result = dict()
         t = 0
         while t < self.runtime:
+            # Compute the PMF from self.events
             pmf = [f[0]((self.state, self.parameters)) for f in self.events]
+            # Extract the event consequences from self.events
             tmp = [f[1] for f in self.events]
+
+            # Check the PMF is non-negative and has a positive sum
             assert all(_ >= 0.0 for _ in pmf)
             assert sum(pmf) > 0.0
+
+            # Compute the delay parameter for generating wait time between events
             delay_parameter = float(sum(pmf))
+            # Generate wait time
             event_delay = sample_delay(delay_parameter)
+            # Update time
             t += event_delay
+            # Generate an event identity
             event_identity = sample_index(pmf)
+            # Get the event differential and apply it
             event_differential = tmp[event_identity]
-            result[t] = [self.state, event_delay, event_identity, event_differential]
             self.state = [sum(_) for _ in zip(event_differential, self.state)]
+            # Record results
+            result[t] = [self.state, event_delay, event_identity, event_differential]
+
         return result
 
 
 def standard_SIR(fn, gestation_period=280.0, proportion_population_preggers=0.25525, human_lifespan=30842.5, sqrt_median_time_between_trips_outside_the_house=sqrt(2.0), social_distancing_modifier=0.0, probability_of_transmission_per_contact=0.01, median_time_before_recovery=28.0, proportion_of_people_with_capacity_to_recover_at_all=1.0, infection_fatality_period=14.0):
-    parameters = []
-    # parameters are per-capita
+    """ The parameter values included as defaults are either magic or random numbers, or made up, or whatever; pass in your own parameters to make your own simulations!"""
+
+    # We show how to compute parameters from source-able numbers like human gestation period.
+    parameters = []  # parameters are per-capita
 
     birth_rate = proportion_population_preggers / gestation_period
     parameters += [birth_rate]
@@ -105,6 +125,12 @@ def standard_SIR(fn, gestation_period=280.0, proportion_population_preggers=0.25
     runtime = 200.0
     state = [90, 10, 0]
 
+    # This is a complete list of all possible events in a standard SIR model... sort of.
+    # For example, we are allowing infectious people to give birth to infectious people (lol)
+    # Note that if some event occurs with a very low probability, it can generally be discarded from the simulation
+    # entirely. For example, in a population with an extremely long gestation period, there's no reason to even
+    # include birth rates. Similarly, if the lifespan is very high compared to how rapidly an infection moves through
+    # the population, natural death rates can be ignored too
     sus_births_sus = [lambda x: x[1][0]*x[0][0], [1, 0, 0]]
     sus_dies_naturally = [lambda x: x[1][1]*x[0][0], [-1, 0, 0]]
     sus_gets_infected = [lambda x: x[1][2]*x[0][0]*x[0][1], [-1, 1, 0]]
@@ -118,18 +144,16 @@ def standard_SIR(fn, gestation_period=280.0, proportion_population_preggers=0.25
     events = [sus_births_sus, sus_dies_naturally, sus_gets_infected, res_births_sus, inf_recovers, inf_dies_naturally]
     events += [inf_dies_from_disease, inf_births_inf_lol, res_dies_naturally]
 
+    # Create outbreak and record results
     inp = dict()
     inp['parameters'] = parameters
     inp['runtime'] = runtime
     inp['initial state'] = state
     inp['events'] = events
-
     ollie = Outbreak(inp)
     result = ollie.run()
-
     with open(fn, "w+") as wf:
         wf.write("t,S,I,R\n")
-
     timeline = sorted(list(result.keys()))
     for next_t in timeline:
         next_state = result[next_t][0]
